@@ -39,6 +39,24 @@ st.divider()
 # ---------------- SIDEBAR ---------------- #
 
 with st.sidebar:
+    st.header("🔑 API Configuration")
+    
+    # Allow users to input keys directly if secrets are missing or invalid
+    st.session_state["GROQ_API_KEY"] = st.text_input(
+        "Groq API Key",
+        value=st.session_state.get("GROQ_API_KEY", ""),
+        type="password",
+        help="Get your key from https://console.groq.com/keys"
+    )
+    
+    st.session_state["VOYAGE_API_KEY"] = st.text_input(
+        "Voyage AI API Key",
+        value=st.session_state.get("VOYAGE_API_KEY", ""),
+        type="password",
+        help="Get your key from https://dashboard.voyageai.com/"
+    )
+
+    st.divider()
 
     st.header("📂 Upload PDF")
 
@@ -66,64 +84,51 @@ with st.sidebar:
 # ---------------- PDF DETAILS ---------------- #
 
 if uploaded_file:
-
     st.success("✅ PDF Uploaded Successfully")
-
     col1, col2 = st.columns(2)
-
     with col1:
         st.info(f"**File:** {uploaded_file.name}")
-
     with col2:
         st.info(f"**Size:** {uploaded_file.size / 1024:.2f} KB")
 
 # ---------------- PDF PROCESS ---------------- #
 
 if process_button:
-
     if uploaded_file is None:
-
         st.error("Please upload a PDF first.")
-
     else:
-
         progress = st.progress(0)
-
         progress.progress(20, text="📄 Loading PDF...")
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-            tmp_file.write(uploaded_file.read())
-            temp_pdf_path = tmp_file.name
-
-        documents = load_pdf(temp_pdf_path)
-
-        progress.progress(40, text="✂ Splitting Document...")
-
-        chunks = split_documents(documents)
-
-        progress.progress(70, text="🧠 Creating Vector Store...")
-
         try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                tmp_file.write(uploaded_file.read())
+                temp_pdf_path = tmp_file.name
+
+            documents = load_pdf(temp_pdf_path)
+            progress.progress(40, text="✂ Splitting Document...")
+            chunks = split_documents(documents)
+
+            progress.progress(70, text="🧠 Creating Vector Store...")
             vector_store = create_vector_store(chunks)
 
             progress.progress(85, text="🔍 Creating Retriever...")
-
             retriever = get_retriever(vector_store)
-
             chain = get_rag_chain()
 
             st.session_state.retriever = retriever
             st.session_state.chain = chain
 
-            os.remove(temp_pdf_path)
+            if os.path.exists(temp_pdf_path):
+                os.remove(temp_pdf_path)
 
             progress.progress(100, text="✅ Done")
-
             st.success("PDF processed successfully!")
+            
         except Exception as e:
             st.error(f"❌ Error during processing: {str(e)}")
-            if "API_KEY" in str(e):
-                st.info("💡 Tip: Make sure to add your API keys to Streamlit Secrets (Settings > Secrets).")
+            if "API_KEY" in str(e) or "invalid" in str(e).lower():
+                st.info("💡 Tip: You can enter your API keys in the sidebar on the left, or add them to Streamlit Secrets.")
             progress.empty()
 
 st.divider()
@@ -139,37 +144,29 @@ question = st.chat_input(
 # ---------------- ANSWER ---------------- #
 
 if question:
-
     if st.session_state.retriever is None:
-
         st.warning("Please process a PDF first.")
-
     elif question.strip() == "":
-
         st.warning("Please enter a question.")
-
     else:
-
         with st.spinner("🤖 Thinking..."):
-
-            docs = st.session_state.retriever.invoke(question)
-
-            context = "\n\n".join(
-                doc.page_content for doc in docs
-            )
-
-            response = st.session_state.chain.invoke(
-                {
+            try:
+                docs = st.session_state.retriever.invoke(question)
+                context = "\n\n".join(doc.page_content for doc in docs)
+                response = st.session_state.chain.invoke({
                     "context": context,
                     "question": question
-                }
-            )
+                })
 
-        with st.chat_message("user"):
-            st.write(question)
+                with st.chat_message("user"):
+                    st.write(question)
 
-        with st.chat_message("assistant"):
-            st.write(response.content)
+                with st.chat_message("assistant"):
+                    st.write(response.content)
+            except Exception as e:
+                st.error(f"❌ Error during chat: {str(e)}")
+                if "API_KEY" in str(e) or "invalid" in str(e).lower():
+                    st.info("💡 Tip: Check your API keys in the sidebar.")
 
 st.divider()
 
