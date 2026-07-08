@@ -42,35 +42,47 @@ st.divider()
 with st.sidebar:
     st.header("🔑 API Configuration")
     
+    # Input for Groq
     groq_input = st.text_input(
         "Groq API Key",
         value=st.session_state.get("GROQ_API_KEY", ""),
         type="password",
         help="Get your key from https://console.groq.com/keys"
     )
-    st.session_state["GROQ_API_KEY"] = groq_input.strip()
+    if groq_input:
+        st.session_state["GROQ_API_KEY"] = groq_input.strip()
     
+    # Input for Voyage
     voyage_input = st.text_input(
         "Voyage AI API Key",
         value=st.session_state.get("VOYAGE_API_KEY", ""),
         type="password",
         help="Get your key from https://dashboard.voyageai.com/"
     )
-    st.session_state["VOYAGE_API_KEY"] = voyage_input.strip()
+    if voyage_input:
+        st.session_state["VOYAGE_API_KEY"] = voyage_input.strip()
 
+    # Connection Tests
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Test Groq"):
-            with st.spinner("Testing..."):
-                success, msg = test_groq_connection(st.session_state["GROQ_API_KEY"])
-                if success: st.success(msg)
-                else: st.error(msg)
+            if st.session_state.get("GROQ_API_KEY"):
+                with st.spinner("Testing Groq..."):
+                    success, msg = test_groq_connection(st.session_state["GROQ_API_KEY"])
+                    if success: st.success(msg)
+                    else: st.error(msg)
+            else:
+                st.warning("Please enter a Groq key first.")
+                
     with col2:
         if st.button("Test Voyage"):
-            with st.spinner("Testing..."):
-                success, msg = test_voyage_connection(st.session_state["VOYAGE_API_KEY"])
-                if success: st.success(msg)
-                else: st.error(msg)
+            if st.session_state.get("VOYAGE_API_KEY"):
+                with st.spinner("Testing Voyage..."):
+                    success, msg = test_voyage_connection(st.session_state["VOYAGE_API_KEY"])
+                    if success: st.success(msg)
+                    else: st.error(msg)
+            else:
+                st.warning("Please enter a Voyage key first.")
 
     st.divider()
 
@@ -112,6 +124,8 @@ if uploaded_file:
 if process_button:
     if uploaded_file is None:
         st.error("Please upload a PDF first.")
+    elif not st.session_state.get("GROQ_API_KEY") or not st.session_state.get("VOYAGE_API_KEY"):
+        st.error("Please provide both API keys in the sidebar.")
     else:
         progress = st.progress(0)
         progress.progress(20, text="📄 Loading PDF...")
@@ -121,32 +135,36 @@ if process_button:
                 tmp_file.write(uploaded_file.read())
                 temp_pdf_path = tmp_file.name
 
+            # 1. Load PDF
             documents = load_pdf(temp_pdf_path)
-            
             if not documents:
                 raise ValueError("The PDF could not be loaded or is empty.")
 
+            # 2. Split Document
             progress.progress(40, text="✂ Splitting Document...")
             chunks = split_documents(documents)
-            
             if not chunks:
-                raise ValueError("The PDF was loaded but no text chunks could be created.")
+                raise ValueError("No text chunks could be extracted from the PDF.")
 
+            # 3. Create Vector Store
             progress.progress(70, text="🧠 Creating Vector Store...")
             vector_store = create_vector_store(chunks)
 
-            progress.progress(85, text="🔍 Creating Retriever...")
+            # 4. Initialize Chain
+            progress.progress(85, text="🔍 Finalizing Setup...")
             retriever = get_retriever(vector_store)
             chain = get_rag_chain()
 
+            # Store in session state
             st.session_state.retriever = retriever
             st.session_state.chain = chain
 
+            # Cleanup
             if os.path.exists(temp_pdf_path):
                 os.remove(temp_pdf_path)
 
             progress.progress(100, text="✅ Done")
-            st.success("PDF processed successfully!")
+            st.success("PDF processed successfully! You can now ask questions below.")
             
         except Exception as e:
             st.error(f"❌ Error during processing: {str(e)}")
@@ -174,16 +192,16 @@ if question:
     else:
         with st.spinner("🤖 Thinking..."):
             try:
-                # Retrieve relevant documents
+                # Retrieve
                 docs = st.session_state.retriever.invoke(question)
                 
-                # Ensure docs is iterable and contains content
-                if not docs or not isinstance(docs, list):
-                    context = "No relevant context found in the PDF."
+                # Format context
+                if not docs:
+                    context = "No relevant information found in the PDF."
                 else:
                     context = "\n\n".join(doc.page_content for doc in docs if hasattr(doc, 'page_content'))
 
-                # Generate response
+                # Generate
                 response = st.session_state.chain.invoke({
                     "context": context,
                     "question": question
@@ -199,7 +217,7 @@ if question:
                 if "API_KEY" in str(e) or "invalid" in str(e).lower() or "401" in str(e):
                     st.info("💡 Tip: Check your API keys in the sidebar.")
                 elif "iterable" in str(e).lower():
-                    st.info("💡 Tip: This might happen if the PDF processing failed. Please try re-processing the PDF.")
+                    st.info("💡 Tip: Try re-processing the PDF.")
 
 st.divider()
 

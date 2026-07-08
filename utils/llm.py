@@ -3,17 +3,26 @@ import streamlit as st
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 
+# Try to load .env if it exists
 load_dotenv()
 
 def get_llm():
     """
     Create and return the Groq LLM.
     """
-    # Priority: 1. UI Input, 2. Environment Variable, 3. Streamlit Secrets
-    api_key = st.session_state.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+    # Priority: 
+    # 1. UI Input (Session State)
+    # 2. Environment Variable (os.environ)
+    # 3. Streamlit Secrets (st.secrets)
+    
+    api_key = (
+        st.session_state.get("GROQ_API_KEY") or 
+        os.getenv("GROQ_API_KEY") or 
+        st.secrets.get("GROQ_API_KEY")
+    )
 
     if not api_key:
-        raise ValueError("GROQ_API_KEY not found. Please set it in the sidebar, environment variables, or Streamlit secrets.")
+        raise ValueError("GROQ_API_KEY not found. Please provide it in the sidebar or configuration.")
 
     # Clean the key
     api_key = api_key.strip()
@@ -26,6 +35,6 @@ def get_llm():
         )
         return llm
     except Exception as e:
-        if "invalid" in str(e).lower() or "api key" in str(e).lower() or "401" in str(e):
-            raise ValueError("The provided Groq API key is invalid. Please check your key at https://console.groq.com/keys")
+        if "invalid" in str(e).lower() or "401" in str(e):
+            raise ValueError("The Groq API key provided is invalid. Please check your key.")
         raise e
