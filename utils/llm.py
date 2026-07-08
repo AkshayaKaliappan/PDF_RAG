@@ -15,6 +15,9 @@ def get_llm():
     if not api_key:
         raise ValueError("GROQ_API_KEY not found. Please set it in the sidebar, environment variables, or Streamlit secrets.")
 
+    # Clean the key
+    api_key = api_key.strip()
+
     try:
         llm = ChatGroq(
             model="llama-3.1-8b-instant",
@@ -23,6 +26,6 @@ def get_llm():
         )
         return llm
     except Exception as e:
-        if "invalid" in str(e).lower() or "api key" in str(e).lower():
-            raise ValueError("The provided Groq API key is invalid. Please check your key and try again.")
+        if "invalid" in str(e).lower() or "api key" in str(e).lower() or "401" in str(e):
+            raise ValueError("The provided Groq API key is invalid. Please check your key at https://console.groq.com/keys")
         raise e

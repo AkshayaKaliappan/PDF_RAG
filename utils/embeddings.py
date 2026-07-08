@@ -15,6 +15,9 @@ def get_embedding_model():
     if not api_key:
         raise ValueError("VOYAGE_API_KEY not found. Please set it in the sidebar, environment variables, or Streamlit secrets.")
 
+    # Clean the key
+    api_key = api_key.strip()
+
     try:
         embedding_model = VoyageAIEmbeddings(
             model="voyage-3-lite",
@@ -22,6 +25,6 @@ def get_embedding_model():
         )
         return embedding_model
     except Exception as e:
-        if "invalid" in str(e).lower() or "api key" in str(e).lower():
-            raise ValueError("The provided Voyage AI API key is invalid. Please check your key and try again.")
+        if "invalid" in str(e).lower() or "api key" in str(e).lower() or "401" in str(e):
+            raise ValueError("The provided Voyage AI API key is invalid. Please check your key at https://dashboard.voyageai.com/")
         raise e

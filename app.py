@@ -7,6 +7,7 @@ from utils.text_splitter import split_documents
 from utils.vector_store import create_vector_store
 from utils.retriever import get_retriever
 from utils.rag_chain import get_rag_chain
+from utils.test_connection import test_groq_connection, test_voyage_connection
 
 st.set_page_config(
     page_title="PDF RAG Chatbot",
@@ -41,20 +42,35 @@ st.divider()
 with st.sidebar:
     st.header("🔑 API Configuration")
     
-    # Allow users to input keys directly if secrets are missing or invalid
-    st.session_state["GROQ_API_KEY"] = st.text_input(
+    groq_input = st.text_input(
         "Groq API Key",
         value=st.session_state.get("GROQ_API_KEY", ""),
         type="password",
         help="Get your key from https://console.groq.com/keys"
     )
+    st.session_state["GROQ_API_KEY"] = groq_input.strip()
     
-    st.session_state["VOYAGE_API_KEY"] = st.text_input(
+    voyage_input = st.text_input(
         "Voyage AI API Key",
         value=st.session_state.get("VOYAGE_API_KEY", ""),
         type="password",
         help="Get your key from https://dashboard.voyageai.com/"
     )
+    st.session_state["VOYAGE_API_KEY"] = voyage_input.strip()
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Test Groq"):
+            with st.spinner("Testing..."):
+                success, msg = test_groq_connection(st.session_state["GROQ_API_KEY"])
+                if success: st.success(msg)
+                else: st.error(msg)
+    with col2:
+        if st.button("Test Voyage"):
+            with st.spinner("Testing..."):
+                success, msg = test_voyage_connection(st.session_state["VOYAGE_API_KEY"])
+                if success: st.success(msg)
+                else: st.error(msg)
 
     st.divider()
 
@@ -127,8 +143,8 @@ if process_button:
             
         except Exception as e:
             st.error(f"❌ Error during processing: {str(e)}")
-            if "API_KEY" in str(e) or "invalid" in str(e).lower():
-                st.info("💡 Tip: You can enter your API keys in the sidebar on the left, or add them to Streamlit Secrets.")
+            if "API_KEY" in str(e) or "invalid" in str(e).lower() or "401" in str(e):
+                st.info("💡 Tip: Use the 'Test' buttons in the sidebar to verify your keys.")
             progress.empty()
 
 st.divider()
@@ -165,7 +181,7 @@ if question:
                     st.write(response.content)
             except Exception as e:
                 st.error(f"❌ Error during chat: {str(e)}")
-                if "API_KEY" in str(e) or "invalid" in str(e).lower():
+                if "API_KEY" in str(e) or "invalid" in str(e).lower() or "401" in str(e):
                     st.info("💡 Tip: Check your API keys in the sidebar.")
 
 st.divider()
