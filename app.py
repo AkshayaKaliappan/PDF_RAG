@@ -122,8 +122,15 @@ if process_button:
                 temp_pdf_path = tmp_file.name
 
             documents = load_pdf(temp_pdf_path)
+            
+            if not documents:
+                raise ValueError("The PDF could not be loaded or is empty.")
+
             progress.progress(40, text="✂ Splitting Document...")
             chunks = split_documents(documents)
+            
+            if not chunks:
+                raise ValueError("The PDF was loaded but no text chunks could be created.")
 
             progress.progress(70, text="🧠 Creating Vector Store...")
             vector_store = create_vector_store(chunks)
@@ -167,8 +174,16 @@ if question:
     else:
         with st.spinner("🤖 Thinking..."):
             try:
+                # Retrieve relevant documents
                 docs = st.session_state.retriever.invoke(question)
-                context = "\n\n".join(doc.page_content for doc in docs)
+                
+                # Ensure docs is iterable and contains content
+                if not docs or not isinstance(docs, list):
+                    context = "No relevant context found in the PDF."
+                else:
+                    context = "\n\n".join(doc.page_content for doc in docs if hasattr(doc, 'page_content'))
+
+                # Generate response
                 response = st.session_state.chain.invoke({
                     "context": context,
                     "question": question
@@ -183,6 +198,8 @@ if question:
                 st.error(f"❌ Error during chat: {str(e)}")
                 if "API_KEY" in str(e) or "invalid" in str(e).lower() or "401" in str(e):
                     st.info("💡 Tip: Check your API keys in the sidebar.")
+                elif "iterable" in str(e).lower():
+                    st.info("💡 Tip: This might happen if the PDF processing failed. Please try re-processing the PDF.")
 
 st.divider()
 
