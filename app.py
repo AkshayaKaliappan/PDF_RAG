@@ -103,22 +103,28 @@ if process_button:
 
         progress.progress(70, text="🧠 Creating Vector Store...")
 
-        vector_store = create_vector_store(chunks)
+        try:
+            vector_store = create_vector_store(chunks)
 
-        progress.progress(85, text="🔍 Creating Retriever...")
+            progress.progress(85, text="🔍 Creating Retriever...")
 
-        retriever = get_retriever(vector_store)
+            retriever = get_retriever(vector_store)
 
-        chain = get_rag_chain()
+            chain = get_rag_chain()
 
-        st.session_state.retriever = retriever
-        st.session_state.chain = chain
+            st.session_state.retriever = retriever
+            st.session_state.chain = chain
 
-        os.remove(temp_pdf_path)
+            os.remove(temp_pdf_path)
 
-        progress.progress(100, text="✅ Done")
+            progress.progress(100, text="✅ Done")
 
-        st.success("PDF processed successfully!")
+            st.success("PDF processed successfully!")
+        except Exception as e:
+            st.error(f"❌ Error during processing: {str(e)}")
+            if "API_KEY" in str(e):
+                st.info("💡 Tip: Make sure to add your API keys to Streamlit Secrets (Settings > Secrets).")
+            progress.empty()
 
 st.divider()
 
